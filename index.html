@@ -1,77 +1,156 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Westview Lunch</title>
 <style>
-body {font-family: Arial; margin:0; background:#f4f6fb;}
-.app {max-width:600px;margin:auto;background:white;min-height:100vh;}
-header {background:#1f6feb;color:white;padding:15px;text-align:center;}
+body{font-family: Arial;margin:0;background:#f4f6fb;}
+.app{max-width:600px;margin:auto;background:white;min-height:100vh;}
+header{background:#1f6feb;color:white;padding:15px;text-align:center;}
 .screen{display:none;padding:20px;}
 .active{display:block;}
 .btn{width:100%;padding:12px;margin-top:10px;background:#1f6feb;color:white;border:none;border-radius:8px;}
 .item{display:flex;justify-content:space-between;background:#f9fafc;padding:10px;margin:5px 0;border-radius:8px;}
+.cart-item{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #ddd;}
+.cart-total{font-weight:bold;margin-top:10px;}
+.order{border:1px solid #ddd;padding:10px;margin:10px 0;}
 </style>
 </head>
 <body>
-
 <div class="app">
 <header><h2>Westview Lunch</h2></header>
-
 <div id="loginScreen" class="screen active">
-<input id="username" placeholder="Username (Jackson)">
-<input id="password" type="password" placeholder="Password (1234)">
+<input id="username" placeholder="Username">
+<input id="password" type="password" placeholder="Password">
 <button class="btn" onclick="login()">Login</button>
 </div>
-
-<div id="menuScreen" class="screen">
+<div id="studentScreen" class="screen">
+<h3>Menu</h3>
 <div id="menu"></div>
+<h3>Cart</h3>
+<div id="cart"></div>
+<div id="cartTotal" class="cart-total"></div>
+<button class="btn" onclick="submitOrder()">Submit Order</button>
 <button class="btn" onclick="logout()">Logout</button>
 </div>
-
+<div id="staffScreen" class="screen">
+<h3>Orders</h3>
+<div id="orders"></div>
+<button class="btn" onclick="logout()">Logout</button>
 </div>
-
+</div>
 <script>
-let items = [
-{name:"Pizza",cal:"285 cal"},
-{name:"Burger",cal:"320 cal"},
-{name:"Fries",cal:"220 cal"},
-{name:"Cookie",cal:"160 cal"},
-{name:"Drink",cal:"110 cal"}
-];
-
+let items=[{name:'Pizza',cal:285},{name:'Burger',cal:320},{name:'Fries',cal:220},{name:'Cookie',cal:160},{name:'Drink',cal:110}];
+let cart={};
 function show(id){
-document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
-document.getElementById(id).classList.add("active");
+document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+document.getElementById(id).classList.add('active');
 }
-
 function login(){
-let u=document.getElementById("username").value;
-let p=document.getElementById("password").value;
-
-if(u==="Jackson" && p==="1234"){
+let u=document.getElementById('username').value.trim();
+let p=document.getElementById('password').value.trim();
+if(u.toLowerCase()==='staff' && p==='school123'){
+loadOrders();
+show('staffScreen');
+}else if(u && p){
 loadMenu();
-show("menuScreen");
+show('studentScreen');
 }else{
-alert("Use Jackson / 1234");
+alert('Enter username and password');
 }
 }
-
 function logout(){
-show("loginScreen");
+document.getElementById('username').value='';
+document.getElementById('password').value='';
+show('loginScreen');
 }
-
 function loadMenu(){
-let m=document.getElementById("menu");
-m.innerHTML="";
-items.forEach(i=>{
-let d=document.createElement("div");
-d.className="item";
-d.innerHTML=`<span>${i.name} (${i.cal})</span><button>Add</button>`;
-m.appendChild(d);
+const menuDiv=document.getElementById('menu');
+menuDiv.innerHTML='';
+items.forEach(item=>{
+const div=document.createElement('div');
+div.className='item';
+div.innerHTML=`<span>${item.name} (${item.cal} cal)</span><button onclick="addToCart('${item.name}',${item.cal})">Add</button>`;
+menuDiv.appendChild(div);
+});
+cart={};
+renderCart();
+}
+function addToCart(name,cal){
+if(!cart[name]){
+cart[name]={qty:0,cal:cal};
+}
+cart[name].qty++;
+renderCart();
+}
+function removeFromCart(name){
+if(cart[name]){
+cart[name].qty--;
+if(cart[name].qty<=0){
+delete cart[name];
+}
+renderCart();
+}
+}
+function renderCart(){
+const cartDiv=document.getElementById('cart');
+const totalDiv=document.getElementById('cartTotal');
+cartDiv.innerHTML='';
+let totalCal=0;
+Object.keys(cart).forEach(name=>{
+const item=cart[name];
+totalCal+=item.cal*item.qty;
+const row=document.createElement('div');
+row.className='cart-item';
+row.innerHTML=`<span>${name} x${item.qty} (${item.cal*item.qty} cal)</span><button onclick="removeFromCart('${name}')">Remove</button>`;
+cartDiv.appendChild(row);
+});
+totalDiv.innerText='Total: '+totalCal+' cal';
+}
+function submitOrder(){
+const username=document.getElementById('username').value.trim();
+if(Object.keys(cart).length===0){
+alert('Cart is empty');
+return;
+}
+const orders=JSON.parse(localStorage.getItem('orders')||'[]');
+const timestamp=new Date().toLocaleString();
+orders.push({user:username,cart:cart,time:timestamp});
+localStorage.setItem('orders',JSON.stringify(orders));
+alert('Order submitted!');
+cart={};
+renderCart();
+}
+function loadOrders(){
+const ordersDiv=document.getElementById('orders');
+ordersDiv.innerHTML='';
+const orders=JSON.parse(localStorage.getItem('orders')||'[]');
+if(orders.length===0){
+ordersDiv.innerHTML='<p>No orders yet.</p>';
+return;
+}
+orders.forEach((order,index)=>{
+const div=document.createElement('div');
+div.className='order';
+let html=`<strong>Order ${index+1}</strong><br>`;
+html+=`User: ${order.user}<br>`;
+html+=`Time: ${order.time}<br>`;
+html+='Items:<ul>';
+Object.keys(order.cart).forEach(name=>{
+const item=order.cart[name];
+html+=`<li>${name} x${item.qty}</li>`;
+});
+html+='</ul>';
+div.innerHTML=html;
+ordersDiv.appendChild(div);
 });
 }
+setInterval(()=>{
+if(document.getElementById('staffScreen').classList.contains('active')){
+loadOrders();
+}
+},5000);
 </script>
-
 </body>
 </html>
