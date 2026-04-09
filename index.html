@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Westview Lunch</title>
+<style>
+body {font-family: Arial; margin:0; background:#f4f6fb;}
+.app {max-width:600px;margin:auto;background:white;min-height:100vh;}
+header {background:#1f6feb;color:white;padding:15px;text-align:center;}
+.screen{display:none;padding:20px;}
+.active{display:block;}
+.btn{width:100%;padding:12px;margin-top:10px;background:#1f6feb;color:white;border:none;border-radius:8px;}
+.item{display:flex;justify-content:space-between;background:#f9fafc;padding:10px;margin:5px 0;border-radius:8px;}
+</style>
+</head>
+<body>
+
+<div class="app">
+<header><h2>Westview Lunch</h2></header>
+
+<div id="loginScreen" class="screen active">
+<input id="username" placeholder="Username (Jackson)">
+<input id="password" type="password" placeholder="Password (1234)">
+<button class="btn" onclick="login()">Login</button>
+</div>
+
+<div id="menuScreen" class="screen">
+<div id="menu"></div>
+<button class="btn" onclick="logout()">Logout</button>
+</div>
+
+</div>
+
+<script>
+let items = [
+{name:"Pizza",cal:"285 cal"},
+{name:"Burger",cal:"320 cal"},
+{name:"Fries",cal:"220 cal"},
+{name:"Cookie",cal:"160 cal"},
+{name:"Drink",cal:"110 cal"}
+];
+
+function show(id){
+document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+document.getElementById(id).classList.add("active");
+}
+
+function login(){
+let u=document.getElementById("username").value;
+let p=document.getElementById("password").value;
+
+if(u==="Jackson" && p==="1234"){
+loadMenu();
+show("menuScreen");
+}else{
+alert("Use Jackson / 1234");
+}
+}
+
+function logout(){
+show("loginScreen");
+}
+
+function loadMenu(){
+let m=document.getElementById("menu");
+m.innerHTML="";
+items.forEach(i=>{
+let d=document.createElement("div");
+d.className="item";
+d.innerHTML=`<span>${i.name} (${i.cal})</span><button>Add</button>`;
+m.appendChild(d);
+});
+}
+</script>
+
+</body>
+</html>
