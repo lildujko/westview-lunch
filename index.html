@@ -1,532 +1,1039 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Westview Lunch</title>
-    <!--
-      This version of the Westview Lunch app includes a registration system,
-      a richer menu with nutritional facts for each item, and an improved
-      interface. Users can create accounts (stored in the browser’s
-      localStorage), log in, add items to their cart, submit orders, and
-      view incoming orders if logged in as staff. Nutritional information
-      (calories, protein, carbohydrates and fat) is displayed beneath each
-      menu item to help students make informed choices.
-    -->
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            background: #f4f6fb;
-            color: #333;
-        }
-        .app {
-            max-width: 600px;
-            margin: auto;
-            background: #fff;
-            min-height: 100vh;
-            box-shadow: 0 0 10px rgba(0,0,0,0.05);
-        }
-        header {
-            background: #1f6feb;
-            color: #fff;
-            padding: 16px;
-            text-align: center;
-        }
-        h3 {
-            margin-top: 0;
-        }
-        .screen {
-            display: none;
-            padding: 20px;
-        }
-        .active {
-            display: block;
-        }
-        .btn {
-            width: 100%;
-            padding: 12px;
-            margin-top: 10px;
-            background: #1f6feb;
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1em;
-        }
-        .btn:hover {
-            background: #155bb5;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Westview Lunch</title>
+  <style>
+    :root{
+      --blue:#2563eb;
+      --blue-dark:#1d4ed8;
+      --blue-soft:#dbeafe;
+      --bg:#eef4ff;
+      --card:#ffffff;
+      --text:#1f2937;
+      --muted:#6b7280;
+      --line:#dbe3f0;
+      --green:#16a34a;
+      --yellow:#f59e0b;
+      --red:#dc2626;
+      --gray:#64748b;
+      --shadow:0 12px 30px rgba(37,99,235,.10);
+      --radius:18px;
+    }
 
-/* Special button for destructive actions like clearing orders */
-.danger-btn {
-    background: #dc3545;
-}
-.danger-btn:hover {
-    background: #c82333;
-}
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Arial,sans-serif;
+      background:
+        radial-gradient(circle at top left, #c7dcff 0%, transparent 26%),
+        linear-gradient(180deg, #edf4ff 0%, #f8fbff 100%);
+      color:var(--text);
+    }
+    .app{
+      max-width:860px;
+      margin:22px auto;
+      background:rgba(255,255,255,.92);
+      backdrop-filter: blur(10px);
+      min-height:calc(100vh - 44px);
+      border-radius:24px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.8);
+    }
+    header{
+      background:linear-gradient(135deg, #2563eb, #1d4ed8 60%, #3b82f6);
+      color:#fff;
+      padding:26px 24px 22px;
+      text-align:center;
+    }
+    header h1{
+      margin:0;
+      font-size:2.2rem;
+      letter-spacing:.3px;
+    }
+    header p{
+      margin:8px 0 0;
+      opacity:.92;
+      font-size:.98rem;
+    }
 
-/* Smooth fade-in animation for screens */
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+    .screen{display:none;padding:22px;animation:fadeIn .28s ease}
+    .active{display:block}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
-.screen {
-    /* apply animation to screens when shown */
-    animation: fadeIn 0.5s ease;
-}
+    .section-title{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      margin:8px 0 14px;
+    }
+    h2,h3{margin:0}
+    .muted{color:var(--muted)}
+    .small{font-size:.9rem}
+    .tiny{font-size:.8rem}
 
-/* Rounded container and gradient header for a more polished look */
-.app {
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-}
-header {
-    background: linear-gradient(45deg, #1f6feb, #155bb5);
-}
-        .link-btn {
-            background: none;
-            border: none;
-            color: #1f6feb;
-            text-decoration: underline;
-            cursor: pointer;
-            padding: 0;
-            margin-top: 10px;
-        }
-        input {
-            width: 100%;
-            padding: 10px;
-            margin-top: 10px;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-            box-sizing: border-box;
-        }
-        /* Menu & Cart styling */
-        .menu-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #f9fafc;
-            padding: 12px;
-            margin: 8px 0;
-            border-radius: 8px;
-        }
-        .menu-item .details {
-            flex: 1;
-        }
-        .menu-item .details .name-price {
-            font-weight: bold;
-        }
-        .menu-item .details .nutrition {
-            font-size: 0.8em;
-            color: #555;
-            margin-top: 4px;
-        }
-        .cart-section {
-            margin-top: 20px;
-            border-top: 1px solid #ddd;
-            padding-top: 10px;
-        }
-        .cart-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
-        }
-        .cart-item:last-child {
-            border-bottom: none;
-        }
-        .order {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            margin: 10px 0;
-            padding: 10px;
-            background: #f9fafc;
-        }
-    </style>
+    input{
+      width:100%;
+      padding:13px 14px;
+      margin-top:10px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:#fff;
+      color:var(--text);
+      font-size:1rem;
+      outline:none;
+    }
+    input:focus{border-color:#7aa8ff;box-shadow:0 0 0 4px rgba(37,99,235,.10)}
 
-    <!--
-      Supabase JS client library removed.  The CDN was not reliably reachable in some
-      environments, causing the global `supabase` object to be undefined and
-      preventing our JavaScript from running.  Instead of depending on the
-      `supabase-js` library, this version of the app talks to Supabase’s REST
-      API directly using `fetch`.  See the helper functions defined later in
-      the script for details.
-    -->
+    .btn{
+      width:100%;
+      padding:13px 15px;
+      margin-top:12px;
+      background:linear-gradient(135deg, var(--blue), var(--blue-dark));
+      color:#fff;
+      border:none;
+      border-radius:14px;
+      cursor:pointer;
+      font-size:1rem;
+      font-weight:700;
+      letter-spacing:.2px;
+      transition:transform .15s ease, opacity .15s ease, box-shadow .15s ease;
+      box-shadow:0 8px 20px rgba(37,99,235,.18);
+    }
+    .btn:hover{transform:translateY(-1px)}
+    .btn.secondary{
+      background:#fff;
+      color:var(--blue);
+      border:1px solid #bfd4ff;
+      box-shadow:none;
+    }
+    .btn.soft{
+      background:#eef5ff;
+      color:var(--blue-dark);
+      box-shadow:none;
+    }
+    .btn.danger{
+      background:linear-gradient(135deg, #ef4444, #dc2626);
+      box-shadow:0 8px 20px rgba(220,38,38,.15);
+    }
+    .btn.success{
+      background:linear-gradient(135deg, #22c55e, #16a34a);
+      box-shadow:0 8px 20px rgba(22,163,74,.15);
+    }
+    .btn.disabled{
+      opacity:0.5;
+      cursor:not-allowed;
+    }
+
+    .link-btn{
+      background:none;
+      border:none;
+      color:var(--blue);
+      text-decoration:underline;
+      cursor:pointer;
+      padding:0;
+      margin-top:12px;
+      font-size:.95rem;
+    }
+
+    .hero-note, .cutoff-banner, .live-banner{
+      background:linear-gradient(135deg, #eff6ff, #f8fbff);
+      border:1px solid #d8e6ff;
+      border-radius:16px;
+      padding:14px 16px;
+      margin-bottom:16px;
+    }
+    .cutoff-banner strong{color:var(--blue-dark)}
+    .live-banner{background:#f5f9ff}
+
+    .grid{
+      display:grid;
+      gap:14px;
+    }
+    .grid.two{
+      grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    }
+    .grid.three{
+      grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:16px;
+      box-shadow:0 10px 24px rgba(15,23,42,.04);
+    }
+
+    .stats-card .value{
+      font-size:1.5rem;
+      font-weight:800;
+      margin-top:6px;
+      color:var(--blue-dark);
+    }
+
+    .menu-list{display:grid;gap:12px}
+    .menu-item{
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:12px;
+      align-items:center;
+      background:linear-gradient(180deg, #fff, #fbfdff);
+      padding:14px;
+      border:1px solid #e4edf9;
+      border-radius:18px;
+      box-shadow:0 8px 18px rgba(37,99,235,.04);
+    }
+    .menu-main{
+      display:flex;gap:12px;align-items:flex-start;
+    }
+    .emoji{
+      width:44px;height:44px;border-radius:14px;
+      display:flex;align-items:center;justify-content:center;
+      font-size:1.35rem;background:#eff6ff;flex-shrink:0;
+    }
+    .name-price{font-weight:800;font-size:1.02rem}
+    .nutrition{font-size:.82rem;color:var(--muted);margin-top:5px}
+    .pill{
+      display:inline-block;
+      padding:5px 9px;
+      border-radius:999px;
+      background:#eef5ff;
+      color:var(--blue-dark);
+      font-size:.75rem;
+      font-weight:700;
+      margin-top:8px;
+    }
+
+    .cart-section{margin-top:18px}
+    .cart-item{
+      display:grid;
+      grid-template-columns:1fr auto auto;
+      gap:12px;
+      align-items:center;
+      padding:10px 0;
+      border-bottom:1px solid #edf2fb;
+    }
+    .cart-item:last-child{border-bottom:none}
+    .cart-total{
+      margin-top:10px;
+      font-size:1.15rem;
+      font-weight:800;
+      color:var(--blue-dark);
+    }
+
+    .order{
+      border:1px solid #dbe6f6;
+      border-radius:18px;
+      margin:12px 0;
+      padding:16px;
+      background:linear-gradient(180deg,#fff,#fcfdff);
+      box-shadow:0 8px 18px rgba(15,23,42,.04);
+    }
+    .order-top{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:8px;
+      flex-wrap:wrap;
+    }
+    .order-items{color:#374151;line-height:1.5}
+    .order-total{
+      font-weight:800;
+      margin-top:6px;
+      color:var(--blue-dark);
+    }
+
+    .status-chip{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:6px 10px;border-radius:999px;
+      font-size:.78rem;font-weight:800;border:1px solid transparent;
+    }
+    .status-not-started{background:#eef2f7;color:#475569;border-color:#d8e0ea}
+    .status-cooking{background:#fff7e8;color:#a16207;border-color:#fde3a7}
+    .status-cooked{background:#ecfdf3;color:#15803d;border-color:#bbf7d0}
+
+    .actions-row{
+      display:flex;gap:8px;flex-wrap:wrap;margin-top:12px
+    }
+    .mini-btn{
+      border:none;border-radius:999px;padding:8px 12px;cursor:pointer;
+      font-size:.8rem;font-weight:700;
+    }
+    .mini-blue{background:#dbeafe;color:#1d4ed8}
+    .mini-yellow{background:#fef3c7;color:#a16207}
+    .mini-green{background:#dcfce7;color:#15803d}
+    .mini-red{background:#fee2e2;color:#b91c1c}
+    .mini-gray{background:#eef2f7;color:#475569}
+    .mini-btn.active{outline:2px solid currentColor;outline-offset:1px}
+
+    .receipt-box{
+      background:linear-gradient(180deg,#f6fbff,#ffffff);
+      border:1px solid #dbeafe;
+    }
+    .receipt-number{
+      font-size:1.6rem;
+      font-weight:800;
+      color:var(--blue-dark);
+      margin:4px 0 10px;
+    }
+
+    .footer-row{
+      display:flex;gap:10px;flex-wrap:wrap
+    }
+    .footer-row .btn{margin-top:0}
+
+    .login-wrap{
+      max-width:460px;
+      margin:0 auto;
+    }
+
+    @media (max-width: 640px){
+      body{background:#eef4ff}
+      .app{margin:0;min-height:100vh;border-radius:0}
+      .screen{padding:18px}
+      header h1{font-size:1.85rem}
+      .menu-item{grid-template-columns:1fr}
+    }
+  </style>
 </head>
 <body>
-
 <div class="app">
-    <header><h2>Westview Lunch</h2></header>
+  <header>
+    <h1>Westview Lunch</h1>
+    <p>Preorder lunch fast • Track orders live • Present like a pro</p>
+  </header>
 
-    <!-- Login Screen -->
-    <div id="loginScreen" class="screen active">
-        <input id="username" placeholder="Username">
-        <input id="password" type="password" placeholder="Password">
-        <button class="btn" onclick="login()">Login</button>
-        <button class="link-btn" onclick="show('registerScreen')">Create Account</button>
+  <!-- Login Screen -->
+  <div id="loginScreen" class="screen active">
+    <div class="login-wrap">
+      <div class="hero-note">
+        <strong>Presentation Mode Ready</strong>
+        <div class="small muted">Student login: <strong>jackson / 1234</strong> &nbsp;•&nbsp; Staff login: <strong>staff / school123</strong></div>
+      </div>
+      <input id="username" placeholder="Username" />
+      <input id="password" type="password" placeholder="Password" />
+      <button class="btn" onclick="login()">Login</button>
+      <button class="link-btn" onclick="show('registerScreen')">Create Account</button>
+    </div>
+  </div>
+
+  <!-- Register Screen -->
+  <div id="registerScreen" class="screen">
+    <div class="login-wrap">
+      <div class="section-title"><h3>Create Account</h3></div>
+      <input id="regUsername" placeholder="New Username" />
+      <input id="regPassword" type="password" placeholder="New Password" />
+      <button class="btn" onclick="register()">Create Account</button>
+      <button class="link-btn" onclick="show('loginScreen')">Back to Login</button>
+    </div>
+  </div>
+
+  <!-- Student Screen -->
+  <div id="studentScreen" class="screen">
+    <div class="section-title">
+      <div>
+        <h2>Student Ordering</h2>
+        <div id="studentWelcome" class="small muted"></div>
+      </div>
+      <div class="status-chip status-cooked">Live</div>
     </div>
 
-    <!-- Register Screen -->
-    <div id="registerScreen" class="screen">
-        <h3>Create Account</h3>
-        <input id="regUsername" placeholder="New Username">
-        <input id="regPassword" type="password" placeholder="New Password">
-        <button class="btn" onclick="register()">Create</button>
-        <button class="link-btn" onclick="show('loginScreen')">Back to Login</button>
+    <div class="cutoff-banner">
+      <strong>Ordering closes at <span id="cutoffTimeLabel">10:30 AM</span>.</strong>
+      <div id="orderingStatusText" class="small muted"></div>
     </div>
 
-    <!-- Student Screen -->
-    <div id="studentScreen" class="screen">
-        <h3>Menu</h3>
-        <div id="menu"></div>
-        <div class="cart-section">
-            <h3>Your Cart</h3>
-            <div id="cart"></div>
-            <div id="cartTotal"><strong>Total:</strong> $0.00</div>
-            <button class="btn" onclick="submitOrder()">Submit Order</button>
+    <div class="grid two">
+      <!-- Quick Actions and Receipt -->
+      <div class="card">
+        <div class="section-title">
+          <h3>Quick Actions</h3>
         </div>
-        <button class="btn" onclick="logout()">Logout</button>
+        <div class="footer-row">
+          <button class="btn soft" onclick="saveFavoriteOrder()">Save Cart as Favorite</button>
+          <button class="btn secondary" onclick="orderFavorite()">Order Favorite</button>
+          <button class="btn secondary" onclick="orderAgain()">Order Again</button>
+        </div>
+      </div>
+
+      <div id="receiptCard" class="card receipt-box" style="display:none;">
+        <div class="tiny muted">LAST ORDER RECEIPT</div>
+        <div id="receiptNumber" class="receipt-number">#0</div>
+        <div id="receiptStatus"></div>
+        <div id="receiptItems" class="order-items" style="margin-top:10px;"></div>
+        <div id="receiptTotal" class="order-total"></div>
+      </div>
     </div>
 
-    <!-- Staff Screen -->
-    <div id="staffScreen" class="screen">
-        <h3>Incoming Orders</h3>
-        <div id="ordersList"></div>
-    <!-- Clear orders button appears only on staff screen to remove all orders -->
-    <button class="btn danger-btn" onclick="clearOrders()">Clear Orders</button>
-        <button class="btn" onclick="logout()">Logout</button>
+    <div class="section-title" style="margin-top:20px;">
+      <h3>Menu</h3>
+      <div class="small muted">Tap add to build your order</div>
     </div>
+    <div id="menu" class="menu-list"></div>
+
+    <div class="card cart-section">
+      <div class="section-title">
+        <h3>Your Cart</h3>
+        <div class="small muted">Ready for checkout</div>
+      </div>
+      <div id="cart"></div>
+      <div id="cartTotal" class="cart-total">Total: $0.00</div>
+      <div class="footer-row" style="margin-top:14px;">
+        <button id="submitOrderBtn" class="btn success" onclick="submitOrder()">Submit Order</button>
+        <button class="btn secondary" onclick="clearCart()">Clear Cart</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <div class="section-title">
+        <h3>Your Recent Orders</h3>
+        <div class="small muted">Auto-refreshing</div>
+      </div>
+      <div id="studentOrdersList"><em class="muted">No orders yet.</em></div>
+    </div>
+
+    <button class="btn" onclick="logout()" style="margin-top:18px;">Logout</button>
+  </div>
+
+  <!-- Staff Screen -->
+  <div id="staffScreen" class="screen">
+    <div class="section-title">
+      <div>
+        <h2>Staff Dashboard</h2>
+        <div class="small muted">Auto-refreshing every 2 seconds</div>
+      </div>
+      <div class="status-chip status-cooking">Kitchen View</div>
+    </div>
+
+    <div class="live-banner">Track order numbers, update statuses (<strong>Not Started</strong>, <strong>Cooking</strong>, <strong>Cooked</strong>), and reset before your class demo.</div>
+
+    <div class="grid three">
+      <div class="card stats-card">
+        <div class="tiny muted">TOTAL ORDERS</div>
+        <div id="statOrders" class="value">0</div>
+      </div>
+      <div class="card stats-card">
+        <div class="tiny muted">TOTAL SALES</div>
+        <div id="statSales" class="value">$0.00</div>
+      </div>
+      <div class="card stats-card">
+        <div class="tiny muted">MOST POPULAR</div>
+        <div id="statPopular" class="value" style="font-size:1.05rem;">—</div>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:18px;">
+      <h3>Incoming Orders</h3>
+      <div class="small muted">Order numbers included</div>
+    </div>
+    <div id="ordersList"><em class="muted">No orders yet.</em></div>
+
+    <div class="footer-row" style="margin-top:16px;">
+      <button class="btn danger" onclick="clearOrders()">Clear Orders</button>
+      <button class="btn secondary" onclick="logout()">Logout</button>
+    </div>
+  </div>
 </div>
 
 <script>
-// Predefined staff credentials
+// Constants
 const STAFF_USER = 'staff';
 const STAFF_PASS = 'school123';
+const ORDER_CUTOFF_HOUR = 10;
+const ORDER_CUTOFF_MINUTE = 30;
 
-// Initialize Supabase. Replace the placeholders with your project's URL and anon key.
-// You must configure a Supabase project and create an "orders" table with
-// columns: id (serial or UUID), user (text), items (jsonb), created_at (timestamp).
-// The anon key here should be your public (non-secret) anon key from the Supabase dashboard.
-// Replace these placeholders with your own Supabase project URL and anon key.
-// The URL follows the format `https://<project-id>.supabase.co` and the anon
-// key is a JWT obtained from the Supabase dashboard (Legacy API keys tab).
+// Supabase configuration (public)
 const SUPABASE_URL = 'https://tijcoyvtuyrngmhkvjeh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpamNveXZ0dXlybmdtaGt2amVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzI1NDAsImV4cCI6MjA5MTM0ODU0MH0.oPoMZNPD9I_wKtP4KTUqJOXm-MDnCJY0BjMhq-4ooJ8';
-// NOTE: We no longer create a Supabase client via the supabase-js library. Instead
-// we interact with the Supabase REST API directly using fetch. See the helper
-// functions below for details.
 
-// Menu items with nutritional facts
+// Menu items with emojis and nutrition facts
 const items = [
-    {name: 'Pizza Slice', price: 3.50, cal: 285, protein: 12, carbs: 36, fat: 10},
-    {name: 'Cheeseburger', price: 4.00, cal: 320, protein: 17, carbs: 31, fat: 15},
-    {name: 'Fries', price: 2.00, cal: 220, protein: 3, carbs: 29, fat: 10},
-    {name: 'Chocolate Chip Cookie', price: 1.25, cal: 160, protein: 2, carbs: 22, fat: 7},
-    {name: 'Fountain Drink', price: 1.50, cal: 110, protein: 0, carbs: 29, fat: 0},
-    {name: 'Chicken Sandwich', price: 4.50, cal: 400, protein: 25, carbs: 35, fat: 15},
-    {name: 'Hot Dog', price: 3.00, cal: 290, protein: 10, carbs: 22, fat: 18},
-    {name: 'Garden Salad', price: 3.75, cal: 150, protein: 4, carbs: 10, fat: 7},
-    {name: 'Brownie', price: 1.75, cal: 250, protein: 3, carbs: 35, fat: 12},
-    {name: 'Fruit Cup', price: 2.50, cal: 100, protein: 1, carbs: 26, fat: 0}
+  { emoji: '🍕', name:'Pizza Slice', price: 3.50, cal: 285, protein: 12, carbs: 36, fat: 10 },
+  { emoji: '🍔', name:'Cheeseburger', price: 4.00, cal: 320, protein: 17, carbs: 31, fat: 15 },
+  { emoji: '🍟', name:'Fries', price: 2.00, cal: 220, protein: 3, carbs: 29, fat: 10 },
+  { emoji: '🍪', name:'Chocolate Chip Cookie', price: 1.25, cal: 160, protein: 2, carbs: 22, fat: 7 },
+  { emoji: '🥤', name:'Fountain Drink', price: 1.50, cal: 110, protein: 0, carbs: 29, fat: 0 },
+  { emoji: '🍗', name:'Chicken Sandwich', price: 4.50, cal: 400, protein: 25, carbs: 35, fat: 15 },
+  { emoji: '🌭', name:'Hot Dog', price: 3.00, cal: 290, protein: 10, carbs: 22, fat: 18 },
+  { emoji: '🥗', name:'Garden Salad', price: 3.75, cal: 150, protein: 4, carbs: 10, fat: 7 },
+  { emoji: '🍫', name:'Brownie', price: 1.75, cal: 250, protein: 3, carbs: 35, fat: 12 },
+  { emoji: '🍓', name:'Fruit Cup', price: 2.50, cal: 100, protein: 1, carbs: 26, fat: 0 }
 ];
 
-// -----------------------------------------------------------------------------
-// Supabase REST API helpers
-//
-// The supabase-js client library cannot be reliably loaded from a CDN in this
-// environment. To ensure cross-device order storage still works, we call the
-// Supabase REST API directly. Every request must include both the anon API key
-// and an Authorization bearer token header. The functions below abstract
-// common operations on the `orders` table.
-
-/**
- * Insert a new order into the `orders` table.
- *
- * @param {string} user - The username of the person placing the order.
- * @param {Array} itemsArray - Array of objects with keys `name`, `qty` and `price`.
- * @returns {Promise<Object[]>} The inserted row(s) as returned by Supabase.
- */
-async function insertOrder(user, itemsArray) {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-            // Request the inserted row in the response
-            'Prefer': 'return=representation'
-        },
-        body: JSON.stringify([{ user: user, items: itemsArray }])
-    });
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to insert order');
-    }
-    return response.json();
-}
-
-/**
- * Fetch all orders from the `orders` table.
- *
- * @returns {Promise<Object[]>} Array of order records.
- */
-async function fetchOrders() {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*`, {
-        method: 'GET',
-        headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
-        }
-    });
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to fetch orders');
-    }
-    return response.json();
-}
-
-// Cart object to store items and quantities
+// State variables
 let cart = {};
+let currentUser = null;
+let currentRole = null;
+let staffInterval = null;
+let studentInterval = null;
+let ordersData = [];
 
-// Helper to show a screen
+// Helper: Show a particular screen
 function show(id) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
 }
 
-// Register new user (stored in localStorage)
+// Registration
 function register() {
-    const u = document.getElementById('regUsername').value.trim();
-    const p = document.getElementById('regPassword').value.trim();
-    if (!u || !p) {
-        alert('Please enter a username and password.');
-        return;
-    }
-    let users = JSON.parse(localStorage.getItem('westviewUsers') || '[]');
-    // Check if username already exists
-    if (users.some(user => user.username.toLowerCase() === u.toLowerCase())) {
-        alert('Username already exists.');
-        return;
-    }
-    users.push({username: u.toLowerCase(), password: p});
-    localStorage.setItem('westviewUsers', JSON.stringify(users));
-    alert('Account created! Please login.');
-    document.getElementById('regUsername').value = '';
-    document.getElementById('regPassword').value = '';
-    show('loginScreen');
+  const u = document.getElementById('regUsername').value.trim().toLowerCase();
+  const p = document.getElementById('regPassword').value.trim();
+  if (!u || !p) {
+    alert('Please enter a username and password.');
+    return;
+  }
+  let users = JSON.parse(localStorage.getItem('westviewUsers') || '[]');
+  if (users.some(user => user.username === u)) {
+    alert('Username already exists.');
+    return;
+  }
+  users.push({ username: u, password: p });
+  localStorage.setItem('westviewUsers', JSON.stringify(users));
+  alert('Account created! Please login.');
+  document.getElementById('regUsername').value = '';
+  document.getElementById('regPassword').value = '';
+  show('loginScreen');
 }
 
-// Login logic
+// Login
 function login() {
-    const u = document.getElementById('username').value.trim().toLowerCase();
-    const p = document.getElementById('password').value.trim();
-    if (!u) { alert('Enter a username'); return; }
-    // Staff login
-    if (u === STAFF_USER && p === STAFF_PASS) {
-        show('staffScreen');
-        loadOrders();
-        // Poll for new orders every 3 seconds to simulate real‑time updates
-        if (!window.orderInterval) {
-            window.orderInterval = setInterval(loadOrders, 3000);
-        }
-        return;
-    }
-    // Student login – check localStorage accounts or default (jackson/1234)
-    let users = JSON.parse(localStorage.getItem('westviewUsers') || '[]');
-    let validUser = users.find(user => user.username === u && user.password === p);
-    if (!validUser && (u === 'jackson' && p === '1234')) {
-        validUser = {username: u, password: p};
-    }
-    if (validUser) {
-        show('studentScreen');
-        loadMenu();
-    } else {
-        alert('Invalid login. Try registering a new account or use Jackson/1234 for student or staff/school123 for staff.');
-    }
+  const u = document.getElementById('username').value.trim().toLowerCase();
+  const p = document.getElementById('password').value.trim();
+  if (!u) { alert('Enter a username'); return; }
+  // Staff
+  if (u === STAFF_USER && p === STAFF_PASS) {
+    currentUser = u;
+    currentRole = 'staff';
+    localStorage.setItem('westviewCurrentUser', currentUser);
+    localStorage.setItem('westviewCurrentRole', currentRole);
+    startStaff();
+    return;
+  }
+  // Students: check local accounts or default
+  let users = JSON.parse(localStorage.getItem('westviewUsers') || '[]');
+  let validUser = users.find(user => user.username === u && user.password === p);
+  if (!validUser && (u === 'jackson' && p === '1234')) {
+    validUser = { username: u, password: p };
+  }
+  if (validUser) {
+    currentUser = u;
+    currentRole = 'student';
+    localStorage.setItem('westviewCurrentUser', currentUser);
+    localStorage.setItem('westviewCurrentRole', currentRole);
+    startStudent();
+  } else {
+    alert('Invalid login. Try registering a new account or use jackson/1234 for student or staff/school123 for staff.');
+  }
 }
 
-// Logout logic
+// Logout
 function logout() {
-    // Stop staff polling
-    if (window.orderInterval) {
-        clearInterval(window.orderInterval);
-        window.orderInterval = null;
-    }
-    show('loginScreen');
-    cart = {};
-    renderCart();
-    // Clear login fields
-    document.getElementById('username').value = '';
-    document.getElementById('password').value = '';
+  // Clear intervals
+  if (staffInterval) { clearInterval(staffInterval); staffInterval = null; }
+  if (studentInterval) { clearInterval(studentInterval); studentInterval = null; }
+  // Remove persistent login
+  localStorage.removeItem('westviewCurrentUser');
+  localStorage.removeItem('westviewCurrentRole');
+  currentUser = null;
+  currentRole = null;
+  cart = {};
+  renderCart();
+  // hide receipt
+  document.getElementById('receiptCard').style.display = 'none';
+  show('loginScreen');
+  document.getElementById('username').value = '';
+  document.getElementById('password').value = '';
 }
 
-// Render menu items with Add buttons and nutrition info
+// Start student screen
+function startStudent() {
+  show('studentScreen');
+  document.getElementById('studentWelcome').textContent = currentUser ? `Hello, ${currentUser}` : '';
+  loadMenu();
+  checkOrderingEnabled();
+  // Load student orders
+  loadStudentOrders();
+  // Start interval to refresh student orders every 2 seconds
+  if (studentInterval) clearInterval(studentInterval);
+  studentInterval = setInterval(loadStudentOrders, 2000);
+}
+
+// Start staff screen
+function startStaff() {
+  show('staffScreen');
+  loadOrders();
+  if (staffInterval) clearInterval(staffInterval);
+  staffInterval = setInterval(loadOrders, 2000);
+}
+
+// Persistent login on page load
+window.addEventListener('DOMContentLoaded', () => {
+  const savedUser = localStorage.getItem('westviewCurrentUser');
+  const savedRole = localStorage.getItem('westviewCurrentRole');
+  if (savedUser && savedRole) {
+    currentUser = savedUser;
+    currentRole = savedRole;
+    if (currentRole === 'staff') {
+      startStaff();
+    } else {
+      startStudent();
+    }
+  }
+});
+
+// Render menu items
 function loadMenu() {
-    const menuDiv = document.getElementById('menu');
-    menuDiv.innerHTML = '';
-    items.forEach(item => {
-        const div = document.createElement('div');
-        div.className = 'menu-item';
-        div.innerHTML = `
-            <div class="details">
-                <span class="name-price">${item.name} - $${item.price.toFixed(2)}</span>
-                <div class="nutrition">Cal: ${item.cal} | Protein: ${item.protein}g | Carbs: ${item.carbs}g | Fat: ${item.fat}g</div>
-            </div>
-            <button class="btn" style="width:auto; margin-top:0; padding:6px 12px;" onclick="addToCart('${item.name}', ${item.price})">Add</button>
-        `;
-        menuDiv.appendChild(div);
-    });
-    renderCart();
+  const menuDiv = document.getElementById('menu');
+  menuDiv.innerHTML = '';
+  items.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'menu-item';
+    div.innerHTML = `
+      <div class="menu-main">
+        <div class="emoji">${item.emoji}</div>
+        <div>
+          <span class="name-price">${item.name} - $${item.price.toFixed(2)}</span>
+          <div class="nutrition">Cal: ${item.cal} | Protein: ${item.protein}g | Carbs: ${item.carbs}g | Fat: ${item.fat}g</div>
+        </div>
+      </div>
+      <button class="btn soft" style="width:auto; margin-top:0; padding:8px 14px; font-size:.85rem;" onclick="addToCart('${item.name}', ${item.price})">Add</button>
+    `;
+    menuDiv.appendChild(div);
+  });
+  renderCart();
 }
 
 // Add item to cart
 function addToCart(name, price) {
-    if (!cart[name]) {
-        cart[name] = {qty: 0, price: price};
-    }
-    cart[name].qty++;
-    renderCart();
+  if (!cart[name]) {
+    cart[name] = { qty: 0, price: price };
+  }
+  cart[name].qty++;
+  renderCart();
 }
 
 // Remove item from cart
 function removeFromCart(name) {
-    if (cart[name]) {
-        cart[name].qty--;
-        if (cart[name].qty <= 0) {
-            delete cart[name];
-        }
-        renderCart();
+  if (cart[name]) {
+    cart[name].qty--;
+    if (cart[name].qty <= 0) {
+      delete cart[name];
     }
+    renderCart();
+  }
 }
 
-// Render cart contents and total
+// Render cart contents
 function renderCart() {
-    const cartDiv = document.getElementById('cart');
-    const totalDiv = document.getElementById('cartTotal');
-    const names = Object.keys(cart);
-    cartDiv.innerHTML = '';
-    let total = 0;
-    if (names.length === 0) {
-        cartDiv.innerHTML = '<em>Cart is empty.</em>';
-    } else {
-        names.forEach(name => {
-            const item = cart[name];
-            const sub = item.qty * item.price;
-            total += sub;
-            const div = document.createElement('div');
-            div.className = 'cart-item';
-            div.innerHTML = `
-                <span>${name} × ${item.qty}</span>
-                <span>$${sub.toFixed(2)}</span>
-                <button class="btn" style="width:auto; margin-top:0; padding:4px 8px; font-size:0.8em;" onclick="removeFromCart('${name}')">Remove</button>
-            `;
-            cartDiv.appendChild(div);
-        });
-    }
-    totalDiv.innerHTML = '<strong>Total:</strong> $' + total.toFixed(2);
+  const cartDiv = document.getElementById('cart');
+  const totalDiv = document.getElementById('cartTotal');
+  const names = Object.keys(cart);
+  cartDiv.innerHTML = '';
+  let total = 0;
+  if (names.length === 0) {
+    cartDiv.innerHTML = '<em class="muted">Cart is empty.</em>';
+  } else {
+    names.forEach(name => {
+      const item = cart[name];
+      const sub = item.qty * item.price;
+      total += sub;
+      const div = document.createElement('div');
+      div.className = 'cart-item';
+      div.innerHTML = `
+        <span>${name} × ${item.qty}</span>
+        <span>$${sub.toFixed(2)}</span>
+        <button class="btn secondary" style="width:auto; padding:6px 10px; font-size:.78rem;" onclick="removeFromCart('${name}')">Remove</button>
+      `;
+      cartDiv.appendChild(div);
+    });
+  }
+  totalDiv.textContent = 'Total: $' + total.toFixed(2);
 }
 
-// Submit order – save to localStorage and clear cart
+// Clear entire cart
+function clearCart() {
+  cart = {};
+  renderCart();
+}
+
+// Check ordering cutoff
+function checkOrderingEnabled() {
+  const now = new Date();
+  const cutoff = new Date();
+  cutoff.setHours(ORDER_CUTOFF_HOUR, ORDER_CUTOFF_MINUTE, 0, 0);
+  const label = document.getElementById('cutoffTimeLabel');
+  label.textContent = cutoff.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const orderingStatus = document.getElementById('orderingStatusText');
+  const submitOrderBtn = document.getElementById('submitOrderBtn');
+  if (now > cutoff) {
+    orderingStatus.textContent = 'Ordering is closed. Please wait for tomorrow.';
+    submitOrderBtn.disabled = true;
+    submitOrderBtn.classList.add('disabled');
+  } else {
+    orderingStatus.textContent = 'Ordering is open until ' + label.textContent + '.';
+    submitOrderBtn.disabled = false;
+    submitOrderBtn.classList.remove('disabled');
+  }
+}
+
+// Supabase REST API helpers
+async function insertOrder(user, itemsObject) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify([{ user: user, items: itemsObject }])
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to insert order');
+  }
+  return response.json();
+}
+
+async function fetchOrders() {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*`, {
+    method: 'GET',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+    }
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to fetch orders');
+  }
+  return response.json();
+}
+
+async function updateOrder(id, itemsObject) {
+  // Patch order's items field
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify([{ items: itemsObject }])
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to update order');
+  }
+  return response.json();
+}
+
+async function deleteOrder(id) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+    }
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to delete order');
+  }
+  return response.text();
+}
+
+// Submit order
 async function submitOrder() {
-    // Submit order to Supabase and clear the cart. Orders are stored in a shared table
-    // so they can be viewed from any device. Ensure you have created an "orders" table
-    // with columns: id (bigint serial or UUID), user (text), items (jsonb), and created_at (timestamp).
-    if (Object.keys(cart).length === 0) {
-        alert('Your cart is empty.');
-        return;
+  if (Object.keys(cart).length === 0) {
+    alert('Your cart is empty.');
+    return;
+  }
+  // Check ordering open
+  const now = new Date();
+  const cutoff = new Date();
+  cutoff.setHours(ORDER_CUTOFF_HOUR, ORDER_CUTOFF_MINUTE, 0, 0);
+  if (now > cutoff) {
+    alert('Ordering is closed.');
+    return;
+  }
+  // Build items array
+  const itemsArray = Object.keys(cart).map(name => ({ name, qty: cart[name].qty, price: cart[name].price }));
+  // Build order data object with status
+  const orderData = { list: itemsArray, status: 'not_started' };
+  try {
+    const data = await insertOrder(currentUser, orderData);
+    if (data && data[0]) {
+      const order = data[0];
+      // Save last order for orderAgain
+      localStorage.setItem(`lastOrder-${currentUser}`, JSON.stringify(itemsArray));
+      // Save receipt
+      showReceipt(order);
+      // Clear cart
+      cart = {};
+      renderCart();
+      // Refresh orders
+      loadStudentOrders();
+      loadOrders();
+      alert(`Order submitted! Your order number is #${order.id}.`);
     }
-    const u = document.getElementById('username').value.trim().toLowerCase();
-    const itemsArray = Object.keys(cart).map(name => ({
-        name: name,
-        qty: cart[name].qty,
-        price: cart[name].price
-    }));
-    try {
-        await insertOrder(u, itemsArray);
-        alert('Order submitted!');
-        cart = {};
-        renderCart();
-    } catch (err) {
-        console.error('Error submitting order:', err);
-        alert('Error submitting order: ' + err.message);
-    }
+  } catch (err) {
+    console.error('Error submitting order:', err);
+    alert('Error submitting order: ' + err.message);
+  }
 }
 
-// Load orders for staff view
+// Display receipt after submitting order
+function showReceipt(order) {
+  const receiptCard = document.getElementById('receiptCard');
+  receiptCard.style.display = 'block';
+  document.getElementById('receiptNumber').textContent = '#' + order.id;
+  // Determine status
+  const itemsObject = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+  const status = itemsObject.status || 'not_started';
+  document.getElementById('receiptStatus').innerHTML = `<span class="status-chip status-${status}">${status.replace(/_/g, ' ')}</span>`;
+  // Items list
+  const list = itemsObject.list || order.items;
+  let itemsHtml = '';
+  list.forEach(i => {
+    itemsHtml += `${i.qty} × ${i.name} ($${(i.qty * i.price).toFixed(2)})<br>`;
+  });
+  document.getElementById('receiptItems').innerHTML = itemsHtml;
+  const total = list.reduce((sum, i) => sum + i.qty * i.price, 0);
+  document.getElementById('receiptTotal').textContent = 'Total: $' + total.toFixed(2);
+}
+
+// Load staff orders and stats
 async function loadOrders() {
-    // Fetch orders from Supabase and display them in the staff screen.
+  try {
+    const data = await fetchOrders();
+    ordersData = data || [];
+    // Stats
+    const totalOrders = ordersData.length;
+    const totalSales = ordersData.reduce((sum, o) => {
+      const itemsObject = typeof o.items === 'string' ? JSON.parse(o.items) : o.items;
+      const list = itemsObject.list || o.items;
+      return sum + list.reduce((s, i) => s + i.qty * i.price, 0);
+    }, 0);
+    // Most popular item
+    const counts = {};
+    ordersData.forEach(o => {
+      const itemsObject = typeof o.items === 'string' ? JSON.parse(o.items) : o.items;
+      const list = itemsObject.list || o.items;
+      list.forEach(i => {
+        counts[i.name] = (counts[i.name] || 0) + i.qty;
+      });
+    });
+    let mostPopular = '—';
+    let maxCount = 0;
+    for (const name in counts) {
+      if (counts[name] > maxCount) {
+        maxCount = counts[name];
+        mostPopular = name;
+      }
+    }
+    document.getElementById('statOrders').textContent = totalOrders;
+    document.getElementById('statSales').textContent = '$' + totalSales.toFixed(2);
+    document.getElementById('statPopular').textContent = mostPopular;
+    // Orders list
     const ordersList = document.getElementById('ordersList');
-    try {
-        const data = await fetchOrders();
-        if (!data || data.length === 0) {
-            ordersList.innerHTML = '<em>No orders yet.</em>';
-            return;
-        }
-        ordersList.innerHTML = '';
-        // sort in descending order by id (newest first)
-        data.sort((a, b) => b.id - a.id);
-        data.forEach(order => {
-            // If items were stored as JSON in the table they will already be parsed.
-            const itemsList = Array.isArray(order.items)
-                ? order.items
-                : JSON.parse(order.items || '[]');
-            const div = document.createElement('div');
-            div.className = 'order';
-            // Compute total from items
-            const total = itemsList.reduce(
-                (sum, i) => sum + i.qty * i.price,
-                0
-            );
-            div.innerHTML =
-                `<strong>Order #${order.id}</strong> - <em>${order.user}</em><br>` +
-                itemsList
-                    .map(
-                        i =>
-                            `${i.qty} × ${i.name} ($${(
-                                i.qty * i.price
-                            ).toFixed(2)})`
-                    )
-                    .join('<br>') +
-                `<br><strong>Total: $${total.toFixed(2)}</strong>`;
-            ordersList.appendChild(div);
-        });
-    } catch (err) {
-        console.error('Error loading orders:', err);
-        ordersList.innerHTML = '<em>Error loading orders: ' + err.message + '</em>';
+    if (!ordersData || ordersData.length === 0) {
+      ordersList.innerHTML = '<em class="muted">No orders yet.</em>';
+      return;
     }
+    ordersList.innerHTML = '';
+    // Sort by id descending
+    ordersData.sort((a, b) => b.id - a.id);
+    ordersData.forEach(order => {
+      const itemsObject = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+      const list = itemsObject.list || order.items;
+      const status = itemsObject.status || 'not_started';
+      const total = list.reduce((sum, i) => sum + i.qty * i.price, 0);
+      const div = document.createElement('div');
+      div.className = 'order';
+      // Build HTML
+      let itemsHtml = '';
+      list.forEach(i => {
+        itemsHtml += `${i.qty} × ${i.name} ($${(i.qty * i.price).toFixed(2)})<br>`;
+      });
+      // Buttons for statuses
+      const statusButtons = `
+        <div class="actions-row">
+          <button class="mini-btn mini-gray ${status === 'not_started' ? 'active' : ''}" onclick="updateOrderStatus(${order.id}, 'not_started')">Not Started</button>
+          <button class="mini-btn mini-yellow ${status === 'cooking' ? 'active' : ''}" onclick="updateOrderStatus(${order.id}, 'cooking')">Cooking</button>
+          <button class="mini-btn mini-green ${status === 'cooked' ? 'active' : ''}" onclick="updateOrderStatus(${order.id}, 'cooked')">Cooked</button>
+          <button class="mini-btn mini-red" onclick="deleteOrderAndRefresh(${order.id})">Delete</button>
+        </div>
+      `;
+      div.innerHTML = `
+        <div class="order-top">
+          <div><strong>#${order.id}</strong> - <em>${order.user}</em></div>
+          <div><span class="status-chip status-${status}">${status.replace(/_/g, ' ')}</span></div>
+        </div>
+        <div class="order-items">${itemsHtml}</div>
+        <div class="order-total">Total: $${total.toFixed(2)}</div>
+        ${statusButtons}
+      `;
+      ordersList.appendChild(div);
+    });
+  } catch (err) {
+    console.error('Error loading orders:', err);
+    const ordersList = document.getElementById('ordersList');
+    ordersList.innerHTML = '<em class="muted">Error loading orders: ' + err.message + '</em>';
+  }
 }
 
-// Clear all orders from the database. This is available only on the staff screen.
+// Delete order then refresh
+async function deleteOrderAndRefresh(id) {
+  if (!confirm('Delete this order?')) return;
+  try {
+    await deleteOrder(id);
+    loadOrders();
+    loadStudentOrders();
+  } catch (err) {
+    alert('Error deleting order: ' + err.message);
+  }
+}
+
+// Update order status
+async function updateOrderStatus(id, newStatus) {
+  try {
+    // Find order in cached data
+    const order = ordersData.find(o => o.id === id);
+    if (!order) return;
+    const itemsObject = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+    let updatedObject;
+    if (Array.isArray(itemsObject)) {
+      updatedObject = { list: itemsObject, status: newStatus };
+    } else {
+      updatedObject = Object.assign({}, itemsObject, { status: newStatus });
+    }
+    await updateOrder(id, updatedObject);
+    // Refresh both views
+    loadOrders();
+    loadStudentOrders();
+  } catch (err) {
+    console.error('Error updating order status:', err);
+    alert('Error updating status: ' + err.message);
+  }
+}
+
+// Load student orders list
+async function loadStudentOrders() {
+  if (!currentUser) return;
+  try {
+    const data = await fetchOrders();
+    const userOrders = (data || []).filter(o => o.user === currentUser);
+    const listDiv = document.getElementById('studentOrdersList');
+    if (!userOrders || userOrders.length === 0) {
+      listDiv.innerHTML = '<em class="muted">No orders yet.</em>';
+      return;
+    }
+    listDiv.innerHTML = '';
+    // Sort desc
+    userOrders.sort((a, b) => b.id - a.id);
+    userOrders.forEach(order => {
+      const itemsObject = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+      const list = itemsObject.list || order.items;
+      const status = itemsObject.status || 'not_started';
+      const total = list.reduce((sum, i) => sum + i.qty * i.price, 0);
+      let itemsHtml = '';
+      list.forEach(i => {
+        itemsHtml += `${i.qty} × ${i.name} ($${(i.qty * i.price).toFixed(2)})<br>`;
+      });
+      const div = document.createElement('div');
+      div.className = 'order';
+      div.innerHTML = `
+        <div class="order-top">
+          <div><strong>#${order.id}</strong></div>
+          <div><span class="status-chip status-${status}">${status.replace(/_/g, ' ')}</span></div>
+        </div>
+        <div class="order-items">${itemsHtml}</div>
+        <div class="order-total">Total: $${total.toFixed(2)}</div>
+      `;
+      listDiv.appendChild(div);
+    });
+  } catch (err) {
+    console.error('Error loading student orders:', err);
+    document.getElementById('studentOrdersList').innerHTML = '<em class="muted">Error loading orders.</em>';
+  }
+}
+
+// Clear all orders (staff)
 async function clearOrders() {
-    // Confirm with the user to avoid accidental deletion
-    if (!confirm('Are you sure you want to clear all orders?')) return;
-    try {
-        const data = await fetchOrders();
-        if (data && data.length > 0) {
-            // Delete each order by ID
-            for (const order of data) {
-                await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${order.id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'apikey': SUPABASE_ANON_KEY,
-                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
-                    }
-                });
-            }
-        }
-        alert('All orders have been cleared.');
-        // Refresh the orders list
-        loadOrders();
-    } catch (err) {
-        console.error('Error clearing orders:', err);
-        alert('Error clearing orders: ' + err.message);
+  if (!confirm('Are you sure you want to clear all orders?')) return;
+  try {
+    const data = await fetchOrders();
+    if (data && data.length) {
+      for (const order of data) {
+        await deleteOrder(order.id);
+      }
     }
+    alert('All orders have been cleared.');
+    loadOrders();
+    loadStudentOrders();
+  } catch (err) {
+    console.error('Error clearing orders:', err);
+    alert('Error clearing orders: ' + err.message);
+  }
 }
-</script>
 
+// Save current cart as favorite order
+function saveFavoriteOrder() {
+  if (!currentUser) {
+    alert('Please login first.');
+    return;
+  }
+  const itemsArray = Object.keys(cart).map(name => ({ name, qty: cart[name].qty, price: cart[name].price }));
+  if (itemsArray.length === 0) {
+    alert('Cart is empty.');
+    return;
+  }
+  localStorage.setItem(`favoriteOrder-${currentUser}`, JSON.stringify(itemsArray));
+  alert('Favorite order saved!');
+}
+
+// Load favorite order into cart
+function orderFavorite() {
+  if (!currentUser) {
+    alert('Please login first.');
+    return;
+  }
+  const dataStr = localStorage.getItem(`favoriteOrder-${currentUser}`);
+  if (!dataStr) {
+    alert('No favorite order saved.');
+    return;
+  }
+  const itemsArray = JSON.parse(dataStr);
+  cart = {};
+  itemsArray.forEach(i => {
+    cart[i.name] = { qty: i.qty, price: i.price };
+  });
+  renderCart();
+}
+
+// Load last order into cart
+function orderAgain() {
+  if (!currentUser) {
+    alert('Please login first.');
+    return;
+  }
+  const dataStr = localStorage.getItem(`lastOrder-${currentUser}`);
+  if (!dataStr) {
+    alert('No recent order found.');
+    return;
+  }
+  const itemsArray = JSON.parse(dataStr);
+  cart = {};
+  itemsArray.forEach(i => {
+    cart[i.name] = { qty: i.qty, price: i.price };
+  });
+  renderCart();
+}
+
+</script>
 </body>
 </html>
