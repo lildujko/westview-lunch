@@ -744,14 +744,7 @@ async function submitOrder() {
     alert('Your cart is empty.');
     return;
   }
-  // Check ordering open
-  const now = new Date();
-  const cutoff = new Date();
-  cutoff.setHours(ORDER_CUTOFF_HOUR, ORDER_CUTOFF_MINUTE, 0, 0);
-  if (now > cutoff) {
-    alert('Ordering is closed.');
-    return;
-  }
+  // No ordering cutoff anymore. Orders can be submitted at any time.
   // Build items array
   const itemsArray = Object.keys(cart).map(name => ({ name, qty: cart[name].qty, price: cart[name].price }));
   // Build order data object with status
