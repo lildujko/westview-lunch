@@ -119,8 +119,14 @@
         }
     </style>
 
-    <!-- Supabase JS client library (UMD build). Replace version number as needed -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.103.0/dist/supabase.min.js"></script>
+    <!--
+      Supabase JS client library removed.  The CDN was not reliably reachable in some
+      environments, causing the global `supabase` object to be undefined and
+      preventing our JavaScript from running.  Instead of depending on the
+      `supabase-js` library, this version of the app talks to Supabase’s REST
+      API directly using `fetch`.  See the helper functions defined later in
+      the script for details.
+    -->
 </head>
 <body>
 
@@ -179,7 +185,9 @@ const STAFF_PASS = 'school123';
 // key is a JWT obtained from the Supabase dashboard (Legacy API keys tab).
 const SUPABASE_URL = 'https://tijcoyvtuyrngmhkvjeh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpamNveXZ0dXlybmdtaGt2amVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzI1NDAsImV4cCI6MjA5MTM0ODU0MH0.oPoMZNPD9I_wKtP4KTUqJOXm-MDnCJY0BjMhq-4ooJ8';
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// NOTE: We no longer create a Supabase client via the supabase-js library. Instead
+// we interact with the Supabase REST API directly using fetch. See the helper
+// functions below for details.
 
 // Menu items with nutritional facts
 const items = [
@@ -194,6 +202,61 @@ const items = [
     {name: 'Brownie', price: 1.75, cal: 250, protein: 3, carbs: 35, fat: 12},
     {name: 'Fruit Cup', price: 2.50, cal: 100, protein: 1, carbs: 26, fat: 0}
 ];
+
+// -----------------------------------------------------------------------------
+// Supabase REST API helpers
+//
+// The supabase-js client library cannot be reliably loaded from a CDN in this
+// environment. To ensure cross-device order storage still works, we call the
+// Supabase REST API directly. Every request must include both the anon API key
+// and an Authorization bearer token header. The functions below abstract
+// common operations on the `orders` table.
+
+/**
+ * Insert a new order into the `orders` table.
+ *
+ * @param {string} user - The username of the person placing the order.
+ * @param {Array} itemsArray - Array of objects with keys `name`, `qty` and `price`.
+ * @returns {Promise<Object[]>} The inserted row(s) as returned by Supabase.
+ */
+async function insertOrder(user, itemsArray) {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+            // Request the inserted row in the response
+            'Prefer': 'return=representation'
+        },
+        body: JSON.stringify([{ user: user, items: itemsArray }])
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to insert order');
+    }
+    return response.json();
+}
+
+/**
+ * Fetch all orders from the `orders` table.
+ *
+ * @returns {Promise<Object[]>} Array of order records.
+ */
+async function fetchOrders() {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*`, {
+        method: 'GET',
+        headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+        }
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to fetch orders');
+    }
+    return response.json();
+}
 
 // Cart object to store items and quantities
 let cart = {};
@@ -352,20 +415,13 @@ async function submitOrder() {
         price: cart[name].price
     }));
     try {
-        const { data, error } = await supabaseClient
-            .from('orders')
-            .insert([{ user: u, items: itemsArray }]);
-        if (error) {
-            console.error('Error inserting order:', error);
-            alert('Error submitting order: ' + error.message);
-            return;
-        }
+        await insertOrder(u, itemsArray);
         alert('Order submitted!');
         cart = {};
         renderCart();
     } catch (err) {
-        console.error('Unexpected error:', err);
-        alert('Unexpected error submitting order.');
+        console.error('Error submitting order:', err);
+        alert('Error submitting order: ' + err.message);
     }
 }
 
@@ -374,20 +430,14 @@ async function loadOrders() {
     // Fetch orders from Supabase and display them in the staff screen.
     const ordersList = document.getElementById('ordersList');
     try {
-        const { data, error } = await supabaseClient
-            .from('orders')
-            .select('*')
-            .order('id', { ascending: false });
-        if (error) {
-            console.error('Error loading orders:', error);
-            ordersList.innerHTML = '<em>Error loading orders.</em>';
-            return;
-        }
+        const data = await fetchOrders();
         if (!data || data.length === 0) {
             ordersList.innerHTML = '<em>No orders yet.</em>';
             return;
         }
         ordersList.innerHTML = '';
+        // sort in descending order by id (newest first)
+        data.sort((a, b) => b.id - a.id);
         data.forEach(order => {
             // If items were stored as JSON in the table they will already be parsed.
             const itemsList = Array.isArray(order.items)
@@ -414,8 +464,8 @@ async function loadOrders() {
             ordersList.appendChild(div);
         });
     } catch (err) {
-        console.error('Unexpected error loading orders:', err);
-        ordersList.innerHTML = '<em>Unexpected error loading orders.</em>';
+        console.error('Error loading orders:', err);
+        ordersList.innerHTML = '<em>Error loading orders: ' + err.message + '</em>';
     }
 }
 </script>
