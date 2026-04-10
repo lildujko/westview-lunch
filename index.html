@@ -341,7 +341,8 @@
     </div>
 
     <div class="cutoff-banner">
-      <strong>Ordering closes at <span id="cutoffTimeLabel">10:30 AM</span>.</strong>
+      <!-- Ordering availability banner. Since ordering is now always open, show a simple message -->
+      <strong id="cutoffMessage">Ordering is open all day.</strong>
       <div id="orderingStatusText" class="small muted"></div>
     </div>
 
@@ -660,22 +661,13 @@ function clearCart() {
 
 // Check ordering cutoff
 function checkOrderingEnabled() {
-  const now = new Date();
-  const cutoff = new Date();
-  cutoff.setHours(ORDER_CUTOFF_HOUR, ORDER_CUTOFF_MINUTE, 0, 0);
-  const label = document.getElementById('cutoffTimeLabel');
-  label.textContent = cutoff.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  // Always allow ordering throughout the day.
   const orderingStatus = document.getElementById('orderingStatusText');
   const submitOrderBtn = document.getElementById('submitOrderBtn');
-  if (now > cutoff) {
-    orderingStatus.textContent = 'Ordering is closed. Please wait for tomorrow.';
-    submitOrderBtn.disabled = true;
-    submitOrderBtn.classList.add('disabled');
-  } else {
-    orderingStatus.textContent = 'Ordering is open until ' + label.textContent + '.';
-    submitOrderBtn.disabled = false;
-    submitOrderBtn.classList.remove('disabled');
-  }
+  // Show a friendly message letting students know they can order any time.
+  orderingStatus.textContent = 'Ordering is open all day.';
+  submitOrderBtn.disabled = false;
+  submitOrderBtn.classList.remove('disabled');
 }
 
 // Supabase REST API helpers
