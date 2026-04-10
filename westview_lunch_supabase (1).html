@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Westview Lunch</title>
+    <!--
+      This version of the Westview Lunch app includes a registration system,
+      a richer menu with nutritional facts for each item, and an improved
+      interface. Users can create accounts (stored in the browser’s
+      localStorage), log in, add items to their cart, submit orders, and
+      view incoming orders if logged in as staff. Nutritional information
+      (calories, protein, carbohydrates and fat) is displayed beneath each
+      menu item to help students make informed choices.
+    -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #f4f6fb;
+            color: #333;
+        }
+        .app {
+            max-width: 600px;
+            margin: auto;
+            background: #fff;
+            min-height: 100vh;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        }
+        header {
+            background: #1f6feb;
+            color: #fff;
+            padding: 16px;
+            text-align: center;
+        }
+        h3 {
+            margin-top: 0;
+        }
+        .screen {
+            display: none;
+            padding: 20px;
+        }
+        .active {
+            display: block;
+        }
+        .btn {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            background: #1f6feb;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        .btn:hover {
+            background: #155bb5;
+        }
+        .link-btn {
+            background: none;
+            border: none;
+            color: #1f6feb;
+            text-decoration: underline;
+            cursor: pointer;
+            padding: 0;
+            margin-top: 10px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+        /* Menu & Cart styling */
+        .menu-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f9fafc;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+        }
+        .menu-item .details {
+            flex: 1;
+        }
+        .menu-item .details .name-price {
+            font-weight: bold;
+        }
+        .menu-item .details .nutrition {
+            font-size: 0.8em;
+            color: #555;
+            margin-top: 4px;
+        }
+        .cart-section {
+            margin-top: 20px;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+        }
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .cart-item:last-child {
+            border-bottom: none;
+        }
+        .order {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f9fafc;
+        }
+    </style>
+
+    <!-- Supabase JS client library (UMD build). Replace version number as needed -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.103.0/dist/supabase.min.js"></script>
+</head>
+<body>
+
+<div class="app">
+    <header><h2>Westview Lunch</h2></header>
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="screen active">
+        <input id="username" placeholder="Username">
+        <input id="password" type="password" placeholder="Password">
+        <button class="btn" onclick="login()">Login</button>
+        <button class="link-btn" onclick="show('registerScreen')">Create Account</button>
+    </div>
+
+    <!-- Register Screen -->
+    <div id="registerScreen" class="screen">
+        <h3>Create Account</h3>
+        <input id="regUsername" placeholder="New Username">
+        <input id="regPassword" type="password" placeholder="New Password">
+        <button class="btn" onclick="register()">Create</button>
+        <button class="link-btn" onclick="show('loginScreen')">Back to Login</button>
+    </div>
+
+    <!-- Student Screen -->
+    <div id="studentScreen" class="screen">
+        <h3>Menu</h3>
+        <div id="menu"></div>
+        <div class="cart-section">
+            <h3>Your Cart</h3>
+            <div id="cart"></div>
+            <div id="cartTotal"><strong>Total:</strong> $0.00</div>
+            <button class="btn" onclick="submitOrder()">Submit Order</button>
+        </div>
+        <button class="btn" onclick="logout()">Logout</button>
+    </div>
+
+    <!-- Staff Screen -->
+    <div id="staffScreen" class="screen">
+        <h3>Incoming Orders</h3>
+        <div id="ordersList"></div>
+        <button class="btn" onclick="logout()">Logout</button>
+    </div>
+</div>
+
+<script>
+// Predefined staff credentials
+const STAFF_USER = 'staff';
+const STAFF_PASS = 'school123';
+
+// Initialize Supabase. Replace the placeholders with your project's URL and anon key.
+// You must configure a Supabase project and create an "orders" table with
+// columns: id (serial or UUID), user (text), items (jsonb), created_at (timestamp).
+// The anon key here should be your public (non-secret) anon key from the Supabase dashboard.
+const SUPABASE_URL = 'https://your-project.supabase.co';
+const SUPABASE_ANON_KEY = 'your-anon-key';
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Menu items with nutritional facts
+const items = [
+    {name: 'Pizza Slice', price: 3.50, cal: 285, protein: 12, carbs: 36, fat: 10},
+    {name: 'Cheeseburger', price: 4.00, cal: 320, protein: 17, carbs: 31, fat: 15},
+    {name: 'Fries', price: 2.00, cal: 220, protein: 3, carbs: 29, fat: 10},
+    {name: 'Chocolate Chip Cookie', price: 1.25, cal: 160, protein: 2, carbs: 22, fat: 7},
+    {name: 'Fountain Drink', price: 1.50, cal: 110, protein: 0, carbs: 29, fat: 0},
+    {name: 'Chicken Sandwich', price: 4.50, cal: 400, protein: 25, carbs: 35, fat: 15},
+    {name: 'Hot Dog', price: 3.00, cal: 290, protein: 10, carbs: 22, fat: 18},
+    {name: 'Garden Salad', price: 3.75, cal: 150, protein: 4, carbs: 10, fat: 7},
+    {name: 'Brownie', price: 1.75, cal: 250, protein: 3, carbs: 35, fat: 12},
+    {name: 'Fruit Cup', price: 2.50, cal: 100, protein: 1, carbs: 26, fat: 0}
+];
+
+// Cart object to store items and quantities
+let cart = {};
+
+// Helper to show a screen
+function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+
+// Register new user (stored in localStorage)
+function register() {
+    const u = document.getElementById('regUsername').value.trim();
+    const p = document.getElementById('regPassword').value.trim();
+    if (!u || !p) {
+        alert('Please enter a username and password.');
+        return;
+    }
+    let users = JSON.parse(localStorage.getItem('westviewUsers') || '[]');
+    // Check if username already exists
+    if (users.some(user => user.username.toLowerCase() === u.toLowerCase())) {
+        alert('Username already exists.');
+        return;
+    }
+    users.push({username: u.toLowerCase(), password: p});
+    localStorage.setItem('westviewUsers', JSON.stringify(users));
+    alert('Account created! Please login.');
+    document.getElementById('regUsername').value = '';
+    document.getElementById('regPassword').value = '';
+    show('loginScreen');
+}
+
+// Login logic
+function login() {
+    const u = document.getElementById('username').value.trim().toLowerCase();
+    const p = document.getElementById('password').value.trim();
+    if (!u) { alert('Enter a username'); return; }
+    // Staff login
+    if (u === STAFF_USER && p === STAFF_PASS) {
+        show('staffScreen');
+        loadOrders();
+        // Poll for new orders every 3 seconds to simulate real‑time updates
+        if (!window.orderInterval) {
+            window.orderInterval = setInterval(loadOrders, 3000);
+        }
+        return;
+    }
+    // Student login – check localStorage accounts or default (jackson/1234)
+    let users = JSON.parse(localStorage.getItem('westviewUsers') || '[]');
+    let validUser = users.find(user => user.username === u && user.password === p);
+    if (!validUser && (u === 'jackson' && p === '1234')) {
+        validUser = {username: u, password: p};
+    }
+    if (validUser) {
+        show('studentScreen');
+        loadMenu();
+    } else {
+        alert('Invalid login. Try registering a new account or use Jackson/1234 for student or staff/school123 for staff.');
+    }
+}
+
+// Logout logic
+function logout() {
+    // Stop staff polling
+    if (window.orderInterval) {
+        clearInterval(window.orderInterval);
+        window.orderInterval = null;
+    }
+    show('loginScreen');
+    cart = {};
+    renderCart();
+    // Clear login fields
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+}
+
+// Render menu items with Add buttons and nutrition info
+function loadMenu() {
+    const menuDiv = document.getElementById('menu');
+    menuDiv.innerHTML = '';
+    items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'menu-item';
+        div.innerHTML = `
+            <div class="details">
+                <span class="name-price">${item.name} - $${item.price.toFixed(2)}</span>
+                <div class="nutrition">Cal: ${item.cal} | Protein: ${item.protein}g | Carbs: ${item.carbs}g | Fat: ${item.fat}g</div>
+            </div>
+            <button class="btn" style="width:auto; margin-top:0; padding:6px 12px;" onclick="addToCart('${item.name}', ${item.price})">Add</button>
+        `;
+        menuDiv.appendChild(div);
+    });
+    renderCart();
+}
+
+// Add item to cart
+function addToCart(name, price) {
+    if (!cart[name]) {
+        cart[name] = {qty: 0, price: price};
+    }
+    cart[name].qty++;
+    renderCart();
+}
+
+// Remove item from cart
+function removeFromCart(name) {
+    if (cart[name]) {
+        cart[name].qty--;
+        if (cart[name].qty <= 0) {
+            delete cart[name];
+        }
+        renderCart();
+    }
+}
+
+// Render cart contents and total
+function renderCart() {
+    const cartDiv = document.getElementById('cart');
+    const totalDiv = document.getElementById('cartTotal');
+    const names = Object.keys(cart);
+    cartDiv.innerHTML = '';
+    let total = 0;
+    if (names.length === 0) {
+        cartDiv.innerHTML = '<em>Cart is empty.</em>';
+    } else {
+        names.forEach(name => {
+            const item = cart[name];
+            const sub = item.qty * item.price;
+            total += sub;
+            const div = document.createElement('div');
+            div.className = 'cart-item';
+            div.innerHTML = `
+                <span>${name} × ${item.qty}</span>
+                <span>$${sub.toFixed(2)}</span>
+                <button class="btn" style="width:auto; margin-top:0; padding:4px 8px; font-size:0.8em;" onclick="removeFromCart('${name}')">Remove</button>
+            `;
+            cartDiv.appendChild(div);
+        });
+    }
+    totalDiv.innerHTML = '<strong>Total:</strong> $' + total.toFixed(2);
+}
+
+// Submit order – save to localStorage and clear cart
+async function submitOrder() {
+    // Submit order to Supabase and clear the cart. Orders are stored in a shared table
+    // so they can be viewed from any device. Ensure you have created an "orders" table
+    // with columns: id (bigint serial or UUID), user (text), items (jsonb), and created_at (timestamp).
+    if (Object.keys(cart).length === 0) {
+        alert('Your cart is empty.');
+        return;
+    }
+    const u = document.getElementById('username').value.trim().toLowerCase();
+    const itemsArray = Object.keys(cart).map(name => ({
+        name: name,
+        qty: cart[name].qty,
+        price: cart[name].price
+    }));
+    try {
+        const { data, error } = await supabaseClient
+            .from('orders')
+            .insert([{ user: u, items: itemsArray }]);
+        if (error) {
+            console.error('Error inserting order:', error);
+            alert('Error submitting order: ' + error.message);
+            return;
+        }
+        alert('Order submitted!');
+        cart = {};
+        renderCart();
+    } catch (err) {
+        console.error('Unexpected error:', err);
+        alert('Unexpected error submitting order.');
+    }
+}
+
+// Load orders for staff view
+async function loadOrders() {
+    // Fetch orders from Supabase and display them in the staff screen.
+    const ordersList = document.getElementById('ordersList');
+    try {
+        const { data, error } = await supabaseClient
+            .from('orders')
+            .select('*')
+            .order('id', { ascending: false });
+        if (error) {
+            console.error('Error loading orders:', error);
+            ordersList.innerHTML = '<em>Error loading orders.</em>';
+            return;
+        }
+        if (!data || data.length === 0) {
+            ordersList.innerHTML = '<em>No orders yet.</em>';
+            return;
+        }
+        ordersList.innerHTML = '';
+        data.forEach(order => {
+            // If items were stored as JSON in the table they will already be parsed.
+            const itemsList = Array.isArray(order.items)
+                ? order.items
+                : JSON.parse(order.items || '[]');
+            const div = document.createElement('div');
+            div.className = 'order';
+            // Compute total from items
+            const total = itemsList.reduce(
+                (sum, i) => sum + i.qty * i.price,
+                0
+            );
+            div.innerHTML =
+                `<strong>Order #${order.id}</strong> - <em>${order.user}</em><br>` +
+                itemsList
+                    .map(
+                        i =>
+                            `${i.qty} × ${i.name} ($${(
+                                i.qty * i.price
+                            ).toFixed(2)})`
+                    )
+                    .join('<br>') +
+                `<br><strong>Total: $${total.toFixed(2)}</strong>`;
+            ordersList.appendChild(div);
+        });
+    } catch (err) {
+        console.error('Unexpected error loading orders:', err);
+        ordersList.innerHTML = '<em>Unexpected error loading orders.</em>';
+    }
+}
+</script>
+
+</body>
+</html>
