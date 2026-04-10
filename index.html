@@ -57,6 +57,35 @@
         .btn:hover {
             background: #155bb5;
         }
+
+/* Special button for destructive actions like clearing orders */
+.danger-btn {
+    background: #dc3545;
+}
+.danger-btn:hover {
+    background: #c82333;
+}
+
+/* Smooth fade-in animation for screens */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.screen {
+    /* apply animation to screens when shown */
+    animation: fadeIn 0.5s ease;
+}
+
+/* Rounded container and gradient header for a more polished look */
+.app {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+header {
+    background: linear-gradient(45deg, #1f6feb, #155bb5);
+}
         .link-btn {
             background: none;
             border: none;
@@ -167,6 +196,8 @@
     <div id="staffScreen" class="screen">
         <h3>Incoming Orders</h3>
         <div id="ordersList"></div>
+    <!-- Clear orders button appears only on staff screen to remove all orders -->
+    <button class="btn danger-btn" onclick="clearOrders()">Clear Orders</button>
         <button class="btn" onclick="logout()">Logout</button>
     </div>
 </div>
@@ -466,6 +497,33 @@ async function loadOrders() {
     } catch (err) {
         console.error('Error loading orders:', err);
         ordersList.innerHTML = '<em>Error loading orders: ' + err.message + '</em>';
+    }
+}
+
+// Clear all orders from the database. This is available only on the staff screen.
+async function clearOrders() {
+    // Confirm with the user to avoid accidental deletion
+    if (!confirm('Are you sure you want to clear all orders?')) return;
+    try {
+        const data = await fetchOrders();
+        if (data && data.length > 0) {
+            // Delete each order by ID
+            for (const order of data) {
+                await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${order.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+                    }
+                });
+            }
+        }
+        alert('All orders have been cleared.');
+        // Refresh the orders list
+        loadOrders();
+    } catch (err) {
+        console.error('Error clearing orders:', err);
+        alert('Error clearing orders: ' + err.message);
     }
 }
 </script>
